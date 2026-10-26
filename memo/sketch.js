@@ -3,7 +3,7 @@ const M = Matter;
 const STORE = "MINDOSE_STAGE_V2";
 const COLORS = ["#F2A5BD", "#A9BDEB", "#A6D9B8", "#F1D091", "#CBB4E6"];
 const FADE_MS = 30000;
-let bottlePNG, teethPNG, pouchPNG, canvasRef;
+let bottlePNG, bottlePNG2, teethPNG, pouchPNG, canvasRef;
 let world,
   engine,
   stage = "home",
@@ -59,20 +59,9 @@ let paperHoverCurl = 0;
 const RX_STORE = "MINDOSE_RX_PACKS_V2";
 const OLD_RX_STORE = "MINDOSE_RX_PACKS_V1";
 function preload() {
-  bottlePNG = loadImage(
-    "알약통.png",
-    () => {},
-    () => {
-      bottlePNG = null;
-    },
-  );
-  teethPNG = loadImage(
-    "이빨.png",
-    () => {},
-    () => {
-      teethPNG = null;
-    },
-  );
+  bottlePNG = loadImage("알약통.png");
+  bottlePNG2 = loadImage("알약통2.png");
+  teethPNG = loadImage("이빨.png");
   preloadPouch();
 }
 // Real sealed plastic medicine pouch supplied by the user.
@@ -1070,56 +1059,80 @@ function drawCreate() {
     drawingContext.shadowColor = "transparent";
 
     // 말기 전 상태에서만 자동 펄럭임 표시
+
     if (!rollingAnim && rolling < 0.05) {
+      const dc = drawingContext;
       const px = paper.x;
       const py = paper.y;
       const ph = paper.h;
 
-      const wave = (Math.sin(millis() * 0.003) + 1) / 2;
-      const curlW = 7 + wave * 23;
+      // 천천히 반복되는 작은 종이 말림
+      const t = (Math.sin(millis() * 0.0022) + 1) / 2;
+      const ease = t * t * (3 - 2 * t);
 
-      const dc = drawingContext;
+      // 너무 크게 말리지 않고 왼쪽 끝만 살짝
+      const curlW = 15 + ease * 20;
+
       dc.save();
 
-      // 말리는 효과를 메모지 내부에만 표시
+      // 종이 전체 밖으로 그림자가 번지지 않도록 제한
       dc.beginPath();
-      dc.rect(px, py, curlW + 2, ph);
+      dc.rect(px, py, curlW + 22, ph);
       dc.clip();
 
-      // 가장자리의 그림자
-      const shade = dc.createLinearGradient(px, 0, px + curlW, 0);
+      // 회색 사각형 대신 말린 부분 바로 옆의 부드러운 그림자
+      const shadow = dc.createLinearGradient(
+        px + curlW * 0.45,
+        0,
+        px + curlW + 20,
+        0,
+      );
+      shadow.addColorStop(0, "rgba(70,65,60,0.10)");
+      shadow.addColorStop(0.5, "rgba(70,65,60,0.07)");
+      shadow.addColorStop(1, "rgba(70,65,60,0)");
 
-      shade.addColorStop(0, "rgba(65,60,50,0.24)");
-      shade.addColorStop(0.28, "rgba(110,105,95,0.13)");
-      shade.addColorStop(1, "rgba(255,255,255,0)");
+      dc.fillStyle = shadow;
+      dc.fillRect(px + curlW * 0.45, py, curlW + 20, ph);
 
-      dc.fillStyle = shade;
-      dc.fillRect(px, py, curlW, ph);
-
-      // 종이 자체가 안쪽으로 살짝 말린 것처럼 표현
-      const surface = dc.createLinearGradient(px, 0, px + curlW, 0);
-
-      surface.addColorStop(0, "#D5D0C6");
-      surface.addColorStop(0.26, "#F2EEE6");
-      surface.addColorStop(0.58, "#FFFCF6");
-      surface.addColorStop(1, "#E9E4DC");
-
-      dc.fillStyle = surface;
-
+      // 작은 폭으로 둥글게 말리는 종이 표면
       dc.beginPath();
       dc.moveTo(px, py);
 
       dc.bezierCurveTo(
-        px + curlW * 0.9,
-        py + ph * 0.22,
-        px + curlW * 0.9,
-        py + ph * 0.78,
+        px + curlW * 0.38,
+        py + ph * 0.12,
+        px + curlW * 0.75,
+        py + ph * 0.35,
+        px + curlW * 0.72,
+        py + ph * 0.5,
+      );
+
+      dc.bezierCurveTo(
+        px + curlW * 0.75,
+        py + ph * 0.65,
+        px + curlW * 0.38,
+        py + ph * 0.88,
         px,
         py + ph,
       );
 
       dc.closePath();
+
+      // 종이 표면의 은은한 입체 명암
+      const surface = dc.createLinearGradient(px, 0, px + curlW, 0);
+      surface.addColorStop(0, "#E4E1DB");
+      surface.addColorStop(0.22, "#F9F7F2");
+      surface.addColorStop(0.55, "#FFFDF8");
+      surface.addColorStop(0.82, "#F1EEE8");
+      surface.addColorStop(1, "#DCD8D1");
+
+      dc.fillStyle = surface;
       dc.fill();
+
+      // 접힌 가장자리의 매우 얇은 윤곽
+      dc.strokeStyle = "rgba(110,105,100,0.10)";
+      dc.lineWidth = 0.7;
+      dc.stroke();
 
       dc.restore();
     } else if (!rollingAnim) {
@@ -1153,19 +1166,42 @@ function drawCreate() {
   }
 
   // 메모지 아래 왼쪽: 드래그 방향 안내
+
   if (!active && !rollingAnim && rolling < 0.92) {
     push();
 
+    const x = paper.x;
+    const y = paper.y + paper.h * 0.53;
+
+    // 검은색 손그림 느낌의 휘어진 화살표
+    noFill();
+    stroke("#202020");
+    strokeWeight(2.8);
+    strokeCap(ROUND);
+    strokeJoin(ROUND);
+
+    beginShape();
+    vertex(x - 27, y - 14);
+    bezierVertex(x - 69, y - 17, x - 48, y + 21, x + 63, y + 4);
+    endShape();
+
+    // 손으로 그린 듯한 화살촉
+    line(x + 63, y + 4, x + 45, y - 7);
+    line(x + 63, y + 4, x + 49, y + 20);
+
+    // 종이와 겹치는 안내 문구
     noStroke();
-    fill("#777777");
+    fill("#202020");
     textAlign(LEFT, CENTER);
     textStyle(NORMAL);
-    textSize(13);
+    textFont("Marker Felt, Comic Sans MS, cursive");
+    textSize(19);
 
-    text("→  DRAG TO ROLL", paper.x + 6, paper.y + paper.h + 32);
+    text("drag to roll", x - 35, y + 57);
 
     pop();
   }
+
   if (jarFlight) {
     drawJarFlight();
   } else if (active) {
@@ -2041,7 +2077,7 @@ function drawRx() {
   drawBack();
   rxGeom = prescriptionGeometry();
   const { sz, cx, cy, pouch, mouth: mouthBox } = rxGeom;
-  drawAsset(bottlePNG, cx, cy, sz, sz);
+  drawAsset(bottlePNG2, cx, cy, sz, sz);
   const dc = drawingContext;
   dc.save();
   dc.beginPath();
@@ -2307,10 +2343,16 @@ function drawRxDragGuide() {
 
     pop();
   }
-
   // 병 → 입
-  arrow(startX, startY, w * 0.57, h * 0.46);
+  arrow(startX - 30, startY, w * 0.7, h * 0.46 - 30);
 
-  // 병 → 아래 약봉투
-  arrow(startX + w * 0.01, startY + h * 0.07, w * 0.57, h * 0.82);
+  // 병 → 왼쪽 첫 번째 약봉투
+  const firstPouch = pouchAt(0);
+
+  arrow(
+    startX + w * 0.01 - 250,
+    startY + h * 0.1,
+    firstPouch.x + 100,
+    firstPouch.y - firstPouch.h * 0.25,
+  );
 }
