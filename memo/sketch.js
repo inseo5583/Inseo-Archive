@@ -1913,27 +1913,72 @@ function syncRxMemoInput() {
     height: Math.max(38, g.y + g.h - g.memoTop - 70) + "px",
   });
 }
+
 function handlePackDetailClick(p) {
   const g = detailGeometry();
+  const right = g.x + g.w - 31;
+  const top = g.y + 25;
+
+  // DELETE 버튼
   if (
-    p.x < g.x ||
-    p.x > g.x + g.w ||
-    p.y < g.y ||
-    p.y > g.y + g.h ||
-    (p.x > g.x + g.w - 65 && p.y < g.y + g.archH + 52)
+    p.x >= right - 117 &&
+    p.x <= right - 36 &&
+    p.y >= top - 22 &&
+    p.y <= top + 22
+  ) {
+    const pack = rxPacks.find((v) => v.id === selectedPack);
+
+    if (pack && confirm("이 처방전을 삭제할까요?")) {
+      const ids = new Set(pack.ids);
+
+      // 처방전과 그 안의 메모 삭제
+      rxPacks = rxPacks.filter((v) => v.id !== pack.id);
+      notes = notes.filter((v) => !ids.has(v.id));
+
+      selectedPack = null;
+      packDetailScroll = 0;
+
+      persistNotes();
+      persistPrescription();
+      bottleBuild();
+
+      rxScroll = constrain(rxScroll, 0, maxRxScroll());
+      syncRxMemoInput();
+    }
+    return;
+  }
+
+  // X 닫기 버튼
+  if (
+    p.x >= right - 28 &&
+    p.x <= right + 18 &&
+    p.y >= top - 22 &&
+    p.y <= top + 22
   ) {
     selectedPack = null;
     syncRxMemoInput();
     return;
   }
+
+  // 처방전 바깥을 누르면 닫기
+  if (p.x < g.x || p.x > g.x + g.w || p.y < g.y || p.y > g.y + g.h) {
+    selectedPack = null;
+    syncRxMemoInput();
+    return;
+  }
+
+  // 기존 알약 메모 열기
   const pack = rxPacks.find((v) => v.id === selectedPack);
   if (!pack || p.y < g.listTop || p.y > g.listBottom) return;
+
   const index = Math.floor((p.y - g.listTop + packDetailScroll) / g.rowH);
+
   if (index >= 0 && index < pack.ids.length) {
     openNote(pack.ids[index], pack.prescribedAt);
     syncRxMemoInput();
   }
 }
+
 function blueDottedLine(x1, y1, x2, y2) {
   push();
   stroke("#2B76C6");
@@ -2058,7 +2103,7 @@ function drawPackDetail() {
   blueDottedLine(left, g.memoTop - 10, right, g.memoTop - 10);
   fill("#246BC1");
   textAlign(LEFT, TOP);
-  textSize(13);
+  textSize(16);
   textStyle(BOLD);
   text("✚ 메모", left, g.memoTop + 2);
   textStyle(NORMAL);
@@ -2066,11 +2111,32 @@ function drawPackDetail() {
   text("FOR YOUR FUTURE SELF", left, g.y + g.h - 30);
   textAlign(RIGHT, TOP);
   text("잊힌 생각을, 다시 만나는 시간", right, g.y + g.h - 30);
-  // Close icon, upper-right (no interfering text labels).
+
+  // 오른쪽 위 DELETE + X 버튼
+  const buttonY = g.y + 38;
+
+  // DELETE
+  push();
+  noStroke();
+  fill("#246BC1");
+  textAlign(CENTER, CENTER);
+  textStyle(BOLD);
+  textSize(13);
+  text("Delete", right - 76, buttonY);
+  pop();
+
+  // X 닫기 — 기존보다 크게
+  push();
   stroke("#246BC1");
-  strokeWeight(1.6);
-  line(right - 13, g.y + g.archH + 18, right, g.y + g.archH + 31);
-  line(right, g.y + g.archH + 18, right - 13, g.y + g.archH + 31);
+  strokeWeight(2.8);
+  strokeCap(ROUND);
+
+  const closeX = right - 5;
+  const closeY = buttonY;
+
+  line(closeX - 9, closeY - 9, closeX + 9, closeY + 9);
+
+  line(closeX + 9, closeY - 9, closeX - 9, closeY + 9);
   pop();
 }
 function drawRx() {
